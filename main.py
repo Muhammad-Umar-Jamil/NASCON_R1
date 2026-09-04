@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import os
 from dotenv import load_dotenv
 
@@ -735,6 +736,67 @@ def jailbreak_challenge(global_settings):
     user_id = st.session_state['user_id']
     is_tester = (st.session_state.get('role') == 'tester')
     
+    # ── GATEKEEPER OVERLAY (USERS ONLY) ──
+    if st.session_state.get('role') == 'user':
+        components.html("""
+        <script>
+        const parentDoc = window.parent.document;
+        
+        // 1. Anti-DevTools & Anti-Right Click
+        parentDoc.addEventListener('contextmenu', event => event.preventDefault());
+        parentDoc.addEventListener('keydown', function(e) {
+            // Block F12, Ctrl+Shift+I, Ctrl+Shift+C, Ctrl+Shift+J, Ctrl+U
+            if(e.keyCode == 123 || 
+              (e.ctrlKey && e.shiftKey && (e.keyCode == 73 || e.keyCode == 67 || e.keyCode == 74)) || 
+              (e.ctrlKey && e.keyCode == 85)) {
+                e.preventDefault();
+            }
+        });
+
+        // 2. Gatekeeper Overlay (Forces Fullscreen)
+        if (!parentDoc.getElementById('gatekeeper-overlay')) {
+            const overlay = parentDoc.createElement('div');
+            overlay.id = 'gatekeeper-overlay';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;z-index:999999;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#0f0;font-family:monospace;';
+            
+            const msg = parentDoc.createElement('h1');
+            msg.innerText = 'RESTRICTED ARENA';
+            msg.style.cssText = 'font-size:3rem;margin-bottom:10px;text-align:center;';
+            
+            const sub = parentDoc.createElement('p');
+            sub.innerText = 'You must be in Fullscreen mode to compete. Pressing ESC will lock the terminal.';
+            sub.style.cssText = 'font-size:1.2rem;margin-bottom:30px;color:#a8a8a8;text-align:center;';
+            
+            const btn = parentDoc.createElement('button');
+            btn.innerText = 'ENTER FULLSCREEN TO PLAY';
+            btn.style.cssText = 'padding:20px 40px;font-size:24px;background:#facc15;color:#000;cursor:pointer;border:none;border-radius:5px;font-weight:900;text-transform:uppercase;';
+            
+            btn.onclick = () => {
+                parentDoc.documentElement.requestFullscreen().then(() => {
+                    overlay.style.display = 'none';
+                }).catch(e => alert('Fullscreen is required!'));
+            };
+            
+            overlay.appendChild(msg);
+            overlay.appendChild(sub);
+            overlay.appendChild(btn);
+            parentDoc.body.appendChild(overlay);
+            
+            // Check initial state
+            if (parentDoc.fullscreenElement) {
+                overlay.style.display = 'none';
+            }
+            
+            // 3. Monitor Fullscreen Exit (Handles ESC key)
+            parentDoc.addEventListener('fullscreenchange', () => {
+                if (!parentDoc.fullscreenElement) {
+                    overlay.style.display = 'flex';
+                }
+            });
+        }
+        </script>
+        """, height=0, width=0)
+    
     broken_set = st.session_state.get('broken_guardrails', set())
     broken_count = len(broken_set)
     breach_pct = int((broken_count / 3) * 100)
@@ -803,11 +865,10 @@ def jailbreak_challenge(global_settings):
             current_model_idx = all_models.index(active_model) if active_model in all_models else 0
             
             with st.form(f"tester_controls_{g_id}"):
-                model_name_override = st.selectbox(
+                st.caption("You can type ANY valid OpenRouter Model ID here manually.")
+                model_name_override = st.text_input(
                     "Model Override (OpenRouter)",
-                    options=all_models,
-                    index=current_model_idx,
-                    help=f"Choose from all {len(all_models)} models available on OpenRouter."
+                    value=active_model
                 )
                 sys_prompt_override = st.text_area("Live System Prompt Override", value=active_sys_prompt, height=150)
                 f_word_override = st.text_input("Live Forbidden Word Override", value=active_f_word)
