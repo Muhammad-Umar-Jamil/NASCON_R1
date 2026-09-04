@@ -521,9 +521,25 @@ def fetch_openrouter_models():
         return ["openai/gpt-4o", "anthropic/claude-3.5-sonnet", "meta-llama/llama-3.1-70b-instruct"]
 
 
+import threading
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+# ── Global limits for 50+ users ──
+# Only allow 5 simultaneous LLM requests globally. Others wait in line.
+LLM_SEMAPHORE = threading.Semaphore(5)
+
+@st.cache_resource
+def get_http_session():
+    session = requests.Session()
+    # Auto-retry if OpenRouter drops a request due to high load
+    retries = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
+    session.mount('https://', HTTPAdapter(max_retries=retries, pool_connections=50, pool_maxsize=50))
+    return session
+
 def call_openrouter(model: str, messages: list, max_tokens: int, temperature: float,
                    top_p: float, frequency_penalty: float) -> str:
-    """Send a chat completion request to OpenRouter and return the response text."""
+    """Send a chat completion request to OpenRouter using a pooled session."""
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
@@ -539,7 +555,9 @@ def call_openrouter(model: str, messages: list, max_tokens: int, temperature: fl
         "frequency_penalty": frequency_penalty,
         "stream": False,
     }
-    resp = requests.post(
+    
+    session = get_http_session()
+    resp = session.post(
         f"{OPENROUTER_BASE_URL}/chat/completions",
         headers=headers,
         json=payload,
@@ -561,6 +579,9 @@ def main():
     st.markdown('<a href="#arena-top-anchor" class="scroll-top-btn">▲ TOP</a>', unsafe_allow_html=True)
 
     if 'user_id' not in st.session_state:
+        if st.session_state.pop('kicked_out', False):
+            st.error("⚠️ Session expired! Your account logged in from another device.")
+            
         left, right = st.columns([1.1, 1], gap="large")
 
         with left:
@@ -628,6 +649,12 @@ def main():
     # If admin deleted them mid-session, log them out.
     if not current_user_data:
         st.session_state.clear()
+        st.rerun()
+        
+    # Single Device Enforcer
+    if st.session_state.get('session_token') != current_user_data.get('session_token'):
+        st.session_state.clear()
+        st.session_state['kicked_out'] = True
         st.rerun()
         
     global_settings = db.get_settings()
@@ -883,16 +910,17 @@ def jailbreak_challenge(global_settings):
             llm_messages.append({"role": msg["role"], "content": msg["content"]})
 
         with st.chat_message("assistant"):
-            with st.spinner("Target AI is processing..."):
+            with st.spinner("Target AI is processing (Network Queue)..."):
                 try:
-                    response_text = call_openrouter(
-                        model=active_model,
-                        messages=llm_messages,
-                        max_tokens=active_tokens,
-                        temperature=active_temp,
-                        top_p=active_top_p,
-                        frequency_penalty=active_rep_pen,
-                    )
+                    with LLM_SEMAPHORE:  # Blocks here if >5 people are currently generating
+                        response_text = call_openrouter(
+                            model=active_model,
+                            messages=llm_messages,
+                            max_tokens=active_tokens,
+                            temperature=active_temp,
+                            top_p=active_top_p,
+                            frequency_penalty=active_rep_pen,
+                        )
                     
                     st.markdown(response_text)
                     

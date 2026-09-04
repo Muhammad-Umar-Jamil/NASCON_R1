@@ -1,6 +1,7 @@
 import streamlit as st
 import database as db
 import re
+import uuid
 
 def login():
     st.markdown("#### // SECURE ACCESS TERMINAL<br>COMPETITOR AUTH", unsafe_allow_html=True)
@@ -16,6 +17,9 @@ def login():
 
             user = db.get_user(username)
             if user and db.check_password(password, user['password_hash']):
+                new_token = str(uuid.uuid4())
+                db.update_session_token(user['id'], new_token)
+                
                 st.session_state['user_id'] = user['id']
                 st.session_state['username'] = user['username']
                 st.session_state['name'] = user['name']
@@ -23,6 +27,7 @@ def login():
                 st.session_state['is_admin'] = user['is_admin']
                 st.session_state['is_approved'] = user['is_approved']
                 st.session_state['has_broken_guardrail'] = user['has_broken_guardrail']
+                st.session_state['session_token'] = new_token
                 st.session_state['broken_guardrails'] = set()
                 st.success("Access Granted! Welcome back.")
                 st.rerun()

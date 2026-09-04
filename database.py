@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, Float
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.sql import func
-from passlib.hash import bcrypt
+import bcrypt
 import os
 import streamlit as st
 
@@ -45,6 +45,7 @@ class User(Base):
     is_admin = Column(Boolean, default=False, nullable=False)
     is_approved = Column(Boolean, default=False, nullable=False)
     has_broken_guardrail = Column(Boolean, default=False, nullable=False)
+    session_token = Column(String, nullable=True)
 
 class Settings(Base):
     __tablename__ = "settings"
@@ -67,11 +68,14 @@ class Chat(Base):
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
 
 def hash_password(password: str) -> str:
-    return bcrypt.hash(password)
+    # bcrypt requires bytes, and returns bytes. We decode to string for the DB.
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
 
 def check_password(password: str, hashed: str) -> bool:
     try:
-        return bcrypt.verify(password, hashed)
+        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
     except Exception:
         # Fallback for old SHA-256 hashes during transition
         import hashlib
@@ -152,7 +156,8 @@ def get_user(username: str):
                 "roll_no": user.roll_no,
                 "is_admin": user.is_admin,
                 "is_approved": user.is_approved,
-                "has_broken_guardrail": user.has_broken_guardrail
+                "has_broken_guardrail": user.has_broken_guardrail,
+                "session_token": user.session_token
             }
         return None
     finally:
@@ -195,6 +200,16 @@ def update_user_status(user_id: int, status: bool):
         user = db.query(User).filter(User.id == user_id).first()
         if user:
             user.has_broken_guardrail = status
+            db.commit()
+    finally:
+        db.close()
+
+def update_session_token(user_id: int, token: str):
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.session_token = token
             db.commit()
     finally:
         db.close()
