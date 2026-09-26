@@ -608,13 +608,13 @@ def call_transfer_station(model: str, messages: list, max_tokens: int, temperatu
         "Authorization": f"Bearer {TRANSFER_STATION_API_KEY}",
         "Content-Type": "application/json",
     }
+    # frequency_penalty is omitted as it causes 400 Bad Request on many TS models
     payload = {
         "model": model,
         "messages": messages,
         "max_tokens": max_tokens,
         "temperature": temperature,
         "top_p": top_p,
-        "frequency_penalty": frequency_penalty,
         "stream": False,
     }
     
@@ -672,11 +672,64 @@ def main():
             </div>
             """, unsafe_allow_html=True)
 
-            tab1, tab2 = st.tabs(["🔒 Login", "📝 Sign Up"])
+            tab1, tab2, tab3 = st.tabs(["🔒 Login", "📝 Sign Up", "🧪 Experience Lab"])
             with tab1:
                 auth.login()
             with tab2:
                 auth.signup()
+            with tab3:
+                st.markdown("<h3 style='text-align: center;'>Transfer Station Experience Lab</h3>", unsafe_allow_html=True)
+                st.caption("Test the latest Western AI models directly through MakerEnd (Transfer Station) API.")
+                
+                exp_models = {
+                    "GPT-6 Luna (OpenAI)": "gpt-6-luna",
+                    "GPT-5.6 Terra (OpenAI)": "gpt-5.6-terra",
+                    "Claude 5 Sonnet (Anthropic)": "claude-sonnet-5",
+                    "Gemini 3.7 Flash (Google)": "gemini-3.7-flash"
+                }
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    exp_model_name = st.selectbox("Select Model", list(exp_models.keys()))
+                with col2:
+                    exp_temperature = st.slider("Temperature", 0.0, 2.0, 0.7, 0.1, key="exp_temp")
+                
+                exp_sys_prompt = st.text_area("System Prompt", "You are a helpful assistant.", height=100, key="exp_sys")
+                
+                if "exp_lab_messages" not in st.session_state:
+                    st.session_state.exp_lab_messages = []
+                
+                if st.button("🗑️ Clear Chat History", key="exp_clear"):
+                    st.session_state.exp_lab_messages = []
+                    st.rerun()
+                
+                st.divider()
+                
+                for msg in st.session_state.exp_lab_messages:
+                    with st.chat_message(msg["role"]):
+                        st.markdown(msg["content"])
+                
+                if exp_prompt := st.chat_input("Enter your prompt for the Experience Lab..."):
+                    st.session_state.exp_lab_messages.append({"role": "user", "content": exp_prompt})
+                    with st.chat_message("user"):
+                        st.markdown(exp_prompt)
+                        
+                    with st.chat_message("assistant"):
+                        with st.spinner("Generating..."):
+                            try:
+                                api_msgs = [{"role": "system", "content": exp_sys_prompt}] + st.session_state.exp_lab_messages
+                                exp_reply = call_transfer_station(
+                                    model=exp_models[exp_model_name],
+                                    messages=api_msgs,
+                                    max_tokens=1024,
+                                    temperature=exp_temperature,
+                                    top_p=0.9,
+                                    frequency_penalty=0.0
+                                )
+                                st.markdown(exp_reply)
+                                st.session_state.exp_lab_messages.append({"role": "assistant", "content": exp_reply})
+                            except Exception as e:
+                                st.error(f"Error communicating with API: {e}")
         return
 
     # Check Approval
