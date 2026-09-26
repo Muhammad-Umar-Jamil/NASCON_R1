@@ -99,7 +99,7 @@ def admin_panel():
                         tokens = st.slider("Max Tokens", 128, 4096, int(g_data.get('max_tokens', 512)), 64)
                         rp = st.slider("Repetition Penalty", 0.0, 2.0, float(g_data.get('rep_pen', 1.0)), 0.1)
                     
-                    if st.form_submit_button(f"Deploy Settings for Guardrail {gid}", use_container_width=True):
+                    if st.form_submit_button(f"Deploy Settings for Guardrail {gid}", width='stretch'):
                         db.update_guardrail_settings(gid, m_name, s_prompt, f_word, temp, tokens, tp, rp, api_endpoint_val)
                         st.success(f"Global Settings for Guardrail {gid} successfully deployed!")
 
@@ -113,7 +113,7 @@ def admin_panel():
             st.markdown(f'<span class="badge badge-y">{len(pending_users)} AWAITING REVIEW</span>', unsafe_allow_html=True)
             
             # Bulk approve all button
-            if st.button("✅ Approve ALL Pending Users", type="primary", use_container_width=True):
+            if st.button("✅ Approve ALL Pending Users", type="primary", width='stretch'):
                 for u in pending_users:
                     db.approve_user(u['id'])
                 st.success(f"All {len(pending_users)} pending users have been approved!")
@@ -139,12 +139,12 @@ def admin_panel():
                     
                     col1, col2 = st.columns(2)
                     with col1:
-                        if st.button("✅ Approve", key=f"approve_{u['id']}", type="primary", use_container_width=True):
+                        if st.button("✅ Approve", key=f"approve_{u['id']}", type="primary", width='stretch'):
                             db.approve_user(u['id'])
                             st.success(f"{u['username']} has been approved!")
                             st.rerun()
                     with col2:
-                        if st.button("❌ Reject & Delete", key=f"reject_{u['id']}", use_container_width=True):
+                        if st.button("❌ Reject & Delete", key=f"reject_{u['id']}", width='stretch'):
                             db.delete_user(u['id'])
                             st.error(f"{u['username']} rejected and deleted.")
                             st.rerun()
@@ -194,7 +194,7 @@ def admin_panel():
                         "Winner": "🏆" if t['has_broken_guardrail'] else "—",
                         "Session": session_status,
                     })
-                st.dataframe(tester_table, use_container_width=True)
+                st.dataframe(tester_table, width='stretch')
                 
                 # ── Individual Tester Actions ──
                 st.divider()
@@ -225,7 +225,7 @@ def admin_panel():
                     
                     with col_a:
                         if not sel_tester['is_approved']:
-                            if st.button("✅ Approve", key=f"t_approve_{sel_tester['id']}", use_container_width=True):
+                            if st.button("✅ Approve", key=f"t_approve_{sel_tester['id']}", width='stretch'):
                                 db.approve_user(sel_tester['id'])
                                 st.success(f"{sel_tester['username']} approved!")
                                 st.rerun()
@@ -233,17 +233,17 @@ def admin_panel():
                             st.success("Already Approved")
                     
                     with col_b:
-                        if st.button("🔁 Reset Password", key=f"t_reset_{sel_tester['id']}", use_container_width=True):
+                        if st.button("🔁 Reset Password", key=f"t_reset_{sel_tester['id']}", width='stretch'):
                             st.session_state[f'show_reset_{sel_tester["id"]}'] = True
                     
                     with col_c:
-                        if st.button("🚪 Force Logout", key=f"t_kick_{sel_tester['id']}", use_container_width=True):
+                        if st.button("🚪 Force Logout", key=f"t_kick_{sel_tester['id']}", width='stretch'):
                             db.kick_user_session(sel_tester['id'])
                             st.success(f"{sel_tester['username']} session invalidated! They must re-login.")
                             st.rerun()
                     
                     with col_d:
-                        if st.button("⬇️ Demote to User", key=f"t_demote_{sel_tester['id']}", use_container_width=True):
+                        if st.button("⬇️ Demote to User", key=f"t_demote_{sel_tester['id']}", width='stretch'):
                             db.update_user_role(sel_tester['id'], 'user')
                             st.warning(f"{sel_tester['username']} demoted to regular user.")
                             st.rerun()
@@ -252,7 +252,7 @@ def admin_panel():
                     if st.session_state.get(f'show_reset_{sel_tester["id"]}'):
                         with st.form(f"reset_pass_form_{sel_tester['id']}"):
                             new_pass = st.text_input("New Password", type="password", key=f"new_pass_{sel_tester['id']}")
-                            if st.form_submit_button("Confirm Password Reset", use_container_width=True):
+                            if st.form_submit_button("Confirm Password Reset", width='stretch'):
                                 if new_pass and len(new_pass) >= 6:
                                     db.reset_user_password(sel_tester['id'], new_pass)
                                     db.kick_user_session(sel_tester['id'])
@@ -292,7 +292,7 @@ def admin_panel():
                     ct_phone = st.text_input("Phone")
                     ct_nu_id = st.text_input("NU ID (Format: 2xI-xxxx)")
                 
-                if st.form_submit_button("Create Tester Account", type="primary", use_container_width=True):
+                if st.form_submit_button("Create Tester Account", type="primary", width='stretch'):
                     if not ct_username or not ct_password or not ct_name:
                         st.error("Username, Password, and Name are required.")
                     elif len(ct_password) < 6:
@@ -340,7 +340,7 @@ def admin_panel():
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    if st.button(f"⬆️ Promote {promote_user['username']} to Tester", type="primary", use_container_width=True):
+                    if st.button(f"⬆️ Promote {promote_user['username']} to Tester", type="primary", width='stretch'):
                         db.update_user_role(promote_user['id'], 'tester')
                         db.kick_user_session(promote_user['id'])
                         st.success(f"✅ {promote_user['username']} is now a Tester! Their session has been reset — they need to re-login to see tester controls.")
@@ -362,7 +362,7 @@ def admin_panel():
                 </div>
                 """, unsafe_allow_html=True)
                 if pending_testers:
-                    if st.button(f"✅ Approve All {len(pending_testers)} Pending Testers", type="primary", use_container_width=True):
+                    if st.button(f"✅ Approve All {len(pending_testers)} Pending Testers", type="primary", width='stretch'):
                         for t in pending_testers:
                             db.approve_user(t['id'])
                         st.success(f"All {len(pending_testers)} testers approved!")
@@ -378,7 +378,7 @@ def admin_panel():
                 </div>
                 """, unsafe_allow_html=True)
                 if active_testers:
-                    if st.button(f"🚪 Force Logout All {len(active_testers)} Active Testers", use_container_width=True):
+                    if st.button(f"🚪 Force Logout All {len(active_testers)} Active Testers", width='stretch'):
                         for t in active_testers:
                             db.kick_user_session(t['id'])
                         st.success(f"All {len(active_testers)} tester sessions invalidated!")
@@ -399,7 +399,7 @@ def admin_panel():
                 """, unsafe_allow_html=True)
                 all_active = [u for u in users if u.get('session_token') and not u.get('is_admin')]
                 if all_active:
-                    if st.button(f"🚪 Force Logout ALL {len(all_active)} Users", use_container_width=True):
+                    if st.button(f"🚪 Force Logout ALL {len(all_active)} Users", width='stretch'):
                         for u in all_active:
                             db.kick_user_session(u['id'])
                         st.success(f"All {len(all_active)} user sessions invalidated!")
@@ -416,7 +416,7 @@ def admin_panel():
                 """, unsafe_allow_html=True)
                 all_winners = [u for u in users if u['has_broken_guardrail'] and not u.get('is_admin')]
                 if all_winners:
-                    if st.button(f"🔄 Reset All {len(all_winners)} Winners", use_container_width=True):
+                    if st.button(f"🔄 Reset All {len(all_winners)} Winners", width='stretch'):
                         for u in all_winners:
                             db.update_user_status(u['id'], False)
                             db.kick_user_session(u['id'])
@@ -443,7 +443,7 @@ def admin_panel():
                     "Winner": "🏆 Yes" if u['has_broken_guardrail'] else "❌ No",
                     "Session": session_status,
                 })
-            st.dataframe(clean_users, use_container_width=True)
+            st.dataframe(clean_users, width='stretch')
         else:
             st.info("No users found.")
 
@@ -504,7 +504,7 @@ def admin_panel():
             
             col_fetch, col_status = st.columns([1, 2])
             with col_fetch:
-                fetch_btn = st.button("📡 Fetch & Test All Chat Models", type="primary", use_container_width=True)
+                fetch_btn = st.button("📡 Fetch & Test All Chat Models", type="primary", width='stretch')
             
             if fetch_btn:
                 with st.spinner("Fetching model list from Transfer Station..."):
@@ -576,11 +576,11 @@ def admin_panel():
                 
                 if working:
                     st.subheader("✅ Working Models")
-                    st.dataframe(working, use_container_width=True)
+                    st.dataframe(working, width='stretch')
                 
                 if failed:
                     with st.expander(f"❌ Failed/Empty Models ({len(failed)})", expanded=False):
-                        st.dataframe(failed, use_container_width=True)
+                        st.dataframe(failed, width='stretch')
 
     # ──────────────────────────────────────────────────────────────────
     # TAB 7: DANGER ZONE

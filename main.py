@@ -699,7 +699,7 @@ def main():
             """, unsafe_allow_html=True)
 
         st.divider()
-        if st.button("Logout", use_container_width=True):
+        if st.button("Logout", width='stretch'):
             st.session_state.clear()
             st.rerun()
         return
@@ -757,16 +757,16 @@ def main():
         st.divider()
         
         if st.session_state.get('is_admin'):
-            if st.button("🛡️ Admin Panel", use_container_width=True):
+            if st.button("🛡️ Admin Panel", width='stretch'):
                 st.session_state['view'] = 'admin'
                 st.rerun()
                 
-        if st.button("⚔️ Jailbreak Arena", use_container_width=True):
+        if st.button("⚔️ Jailbreak Arena", width='stretch'):
             st.session_state['view'] = 'challenge'
             st.rerun()
             
         st.divider()
-        if st.button("➡️ Logout", use_container_width=True):
+        if st.button("➡️ Logout", width='stretch'):
             st.session_state.clear()
             st.rerun()
 
