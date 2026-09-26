@@ -682,8 +682,11 @@ def main():
                 
                 exp_models = {
                     "GPT-6 Luna (OpenAI)": "gpt-6-luna",
+                    "GPT-6 Astra (OpenAI)": "gpt-6-astra",
+                    "GPT-6 Sol (OpenAI)": "gpt-6-sol",
                     "GPT-5.6 Terra (OpenAI)": "gpt-5.6-terra",
                     "Claude 5 Sonnet (Anthropic)": "claude-sonnet-5",
+                    "Claude 5 Fable (Anthropic)": "claude-fable-5",
                     "Gemini 3.7 Flash (Google)": "gemini-3.7-flash"
                 }
                 
