@@ -537,13 +537,13 @@ def fetch_transfer_station_models():
         data = resp.json()
         models = [m["id"] for m in data.get("data", [])]
         
-        # Filter for OpenAI, Claude, Gemini chat models
+        # Filter for only gpt-5.6 and gpt-6 models
         EXCLUDED = ('embedding', 'reranker', 'rerank', 'tts', 'whisper', 'audio', 'speech', 'voice', 'upload', 'video', 'image', 'lipsync', 'jev-', 'vision', 'realtime', 'transcribe', 'astra')
         
         chat_models = []
         for m in models:
             mid = m.lower()
-            if not (mid.startswith('gpt-') or mid.startswith('claude-') or mid.startswith('gemini-')):
+            if not ('gpt-5.6' in mid or 'gpt-6' in mid):
                 continue
             if any(s in mid for s in EXCLUDED):
                 continue

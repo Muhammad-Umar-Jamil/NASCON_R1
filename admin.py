@@ -487,8 +487,8 @@ def admin_panel():
             def is_chat_model(model_id: str) -> bool:
                 mid = model_id.lower()
                 
-                # Check for desired prefixes
-                is_desired_provider = mid.startswith('gpt-') or mid.startswith('claude-') or mid.startswith('gemini-')
+                # Check for desired prefixes (only gpt-5.6 and gpt-6)
+                is_desired_provider = 'gpt-5.6' in mid or 'gpt-6' in mid
                 if not is_desired_provider:
                     return False
                     
