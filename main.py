@@ -608,13 +608,12 @@ def call_transfer_station(model: str, messages: list, max_tokens: int, temperatu
         "Authorization": f"Bearer {TRANSFER_STATION_API_KEY}",
         "Content-Type": "application/json",
     }
-    # frequency_penalty is omitted as it causes 400 Bad Request on many TS models
+    # frequency_penalty and top_p are omitted as they cause 400 Bad Request on many TS models
     payload = {
         "model": model,
         "messages": messages,
         "max_tokens": max_tokens,
         "temperature": temperature,
-        "top_p": top_p,
         "stream": False,
     }
     
