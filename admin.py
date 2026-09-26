@@ -73,7 +73,21 @@ def admin_panel():
                     endpoint_idx = 0 if current_endpoint == 'openrouter' else 1
                     selected_endpoint = st.selectbox("API Endpoint", ["OpenRouter", "Transfer Station"], index=endpoint_idx, key=f"endpoint_{gid}")
                     api_endpoint_val = 'openrouter' if selected_endpoint == 'OpenRouter' else 'transfer_station'
-                    m_name = st.text_input("Model Name", value=g_data.get('model_name', ''))
+                    import main
+                    if api_endpoint_val == 'transfer_station':
+                        all_models_admin = main.fetch_transfer_station_models()
+                    else:
+                        all_models_admin = main.fetch_openrouter_models()
+                    
+                    saved_model = g_data.get('model_name', '')
+                    model_opts_admin = all_models_admin.copy()
+                    if saved_model and saved_model not in model_opts_admin:
+                        model_opts_admin.insert(0, saved_model)
+                    
+                    if not model_opts_admin:
+                        m_name = st.text_input("Model Name", value=saved_model)
+                    else:
+                        m_name = st.selectbox("Model Name", options=model_opts_admin, index=model_opts_admin.index(saved_model) if saved_model in model_opts_admin else 0)
                     s_prompt = st.text_area("System Prompt", value=g_data.get('system_prompt', ''), height=150)
                     f_word = st.text_input("Forbidden Word", value=g_data.get('forbidden_word', ''))
                     

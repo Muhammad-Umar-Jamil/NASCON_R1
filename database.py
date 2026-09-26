@@ -104,6 +104,26 @@ def init_db():
                 is_approved=True
             ))
             
+            # Default Tester Account
+            db.add(User(
+                username="tester", 
+                password_hash=hash_password("tester123"), 
+                name='QA Tester',
+                role='tester',
+                is_admin=False,
+                is_approved=True
+            ))
+            
+            # Default Regular User Account
+            db.add(User(
+                username="player", 
+                password_hash=hash_password("player123"), 
+                name='Player One',
+                role='user',
+                is_admin=False,
+                is_approved=True
+            ))
+            
         if db.query(Settings).count() == 0:
             word1 = _get_secret("WORD_G1", "strawberry")
             word2 = _get_secret("WORD_G2", "pineapple")
