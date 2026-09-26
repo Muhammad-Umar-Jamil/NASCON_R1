@@ -46,6 +46,7 @@ def admin_panel():
         "🧪 Tester Management",
         "📊 User Database",
         "🔍 Chat Transcripts",
+        "🧪 Test Models",
         "❌ Danger Zone"
     ])
 
@@ -68,6 +69,10 @@ def admin_panel():
                 with st.form(f"settings_form_{gid}"):
                     st.subheader(g_data.get('guardrail_name', f"Guardrail {gid}"))
                     st.caption("🔒 The forbidden word below is only ever revealed to Admins and Testers — never to regular users.")
+                    current_endpoint = g_data.get('api_endpoint', 'openrouter')
+                    endpoint_idx = 0 if current_endpoint == 'openrouter' else 1
+                    selected_endpoint = st.selectbox("API Endpoint", ["OpenRouter", "Transfer Station"], index=endpoint_idx, key=f"endpoint_{gid}")
+                    api_endpoint_val = 'openrouter' if selected_endpoint == 'OpenRouter' else 'transfer_station'
                     m_name = st.text_input("Model Name", value=g_data.get('model_name', ''))
                     s_prompt = st.text_area("System Prompt", value=g_data.get('system_prompt', ''), height=150)
                     f_word = st.text_input("Forbidden Word", value=g_data.get('forbidden_word', ''))
@@ -81,7 +86,7 @@ def admin_panel():
                         rp = st.slider("Repetition Penalty", 0.0, 2.0, float(g_data.get('rep_pen', 1.0)), 0.1)
                     
                     if st.form_submit_button(f"Deploy Settings for Guardrail {gid}", use_container_width=True):
-                        db.update_guardrail_settings(gid, m_name, s_prompt, f_word, temp, tokens, tp, rp)
+                        db.update_guardrail_settings(gid, m_name, s_prompt, f_word, temp, tokens, tp, rp, api_endpoint_val)
                         st.success(f"Global Settings for Guardrail {gid} successfully deployed!")
 
     # ──────────────────────────────────────────────────────────────────
@@ -450,9 +455,123 @@ def admin_panel():
                     st.info("No chat transcripts found for this user.")
 
     # ──────────────────────────────────────────────────────────────────
-    # TAB 6: DANGER ZONE
+    # TAB 6: TEST TRANSFER STATION MODELS
     # ──────────────────────────────────────────────────────────────────
     with main_tabs[5]:
+        st.header("🧪 Test Transfer Station Models")
+        st.caption("Tests chat models from Transfer Station (MakerEnd). Only models from OpenAI (gpt-), Claude (claude-), and Gemini (gemini-) that return a valid response are tested and shown.")
+        
+        import requests
+        import os
+        
+        TS_KEY = os.getenv("TRANSFER_STATION_API_KEY", "")
+        TS_URL = "https://makerend.com/v1"
+        
+        if not TS_KEY:
+            st.error("⚠️ TRANSFER_STATION_API_KEY is not set in .env. Cannot test models.")
+        else:
+            def is_chat_model(model_id: str) -> bool:
+                mid = model_id.lower()
+                
+                # Check for desired prefixes
+                is_desired_provider = mid.startswith('gpt-') or mid.startswith('claude-') or mid.startswith('gemini-')
+                if not is_desired_provider:
+                    return False
+                    
+                # Exclude specific sub-types (image, audio, embedding, etc.)
+                EXCLUDED_SUBSTRINGS = (
+                    'embedding', 'reranker', 'rerank', 'tts', 'whisper', 'audio',
+                    'speech', 'voice', 'upload', 'video', 'image', 'lipsync', 'jev-',
+                    'vision', 'realtime', 'transcribe', 'astra'
+                )
+                if any(s in mid for s in EXCLUDED_SUBSTRINGS):
+                    return False
+                return True
+            
+            col_fetch, col_status = st.columns([1, 2])
+            with col_fetch:
+                fetch_btn = st.button("📡 Fetch & Test All Chat Models", type="primary", use_container_width=True)
+            
+            if fetch_btn:
+                with st.spinner("Fetching model list from Transfer Station..."):
+                    try:
+                        resp = requests.get(
+                            f"{TS_URL}/models",
+                            headers={"Authorization": f"Bearer {TS_KEY}"},
+                            timeout=15
+                        )
+                        resp.raise_for_status()
+                        all_models = sorted([m["id"] for m in resp.json().get("data", [])], key=lambda x: x.lower())
+                    except Exception as e:
+                        st.error(f"Failed to fetch models: {e}")
+                        all_models = []
+                
+                chat_models = [m for m in all_models if is_chat_model(m)]
+                st.info(f"Found **{len(chat_models)}** OpenAI/Claude/Gemini chat-capable models out of {len(all_models)} total. Testing each...")
+                
+                results = []
+                progress = st.progress(0, text="Testing models...")
+                
+                for idx, model_id in enumerate(chat_models):
+                    progress.progress((idx + 1) / len(chat_models), text=f"Testing {model_id} ({idx+1}/{len(chat_models)})...")
+                    try:
+                        test_resp = requests.post(
+                            f"{TS_URL}/chat/completions",
+                            headers={
+                                "Authorization": f"Bearer {TS_KEY}",
+                                "Content-Type": "application/json",
+                            },
+                            json={
+                                "model": model_id,
+                                "messages": [{"role": "user", "content": "Say hello in one word."}],
+                                "max_tokens": 20,
+                                "temperature": 0.1,
+                                "stream": False,
+                            },
+                            timeout=30
+                        )
+                        if test_resp.status_code == 200:
+                            data = test_resp.json()
+                            reply = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                            if reply and len(reply.strip()) > 0:
+                                results.append({"Model": model_id, "Status": "✅ Working", "Response": reply.strip()[:80]})
+                            else:
+                                results.append({"Model": model_id, "Status": "⚠️ Empty Response", "Response": "—"})
+                        else:
+                            err = ""
+                            try:
+                                err = test_resp.json().get("error", {}).get("message", str(test_resp.status_code))
+                            except Exception:
+                                err = str(test_resp.status_code)
+                            results.append({"Model": model_id, "Status": "❌ Failed", "Response": err[:80]})
+                    except Exception as e:
+                        results.append({"Model": model_id, "Status": "❌ Error", "Response": str(e)[:80]})
+                
+                progress.empty()
+                
+                working = [r for r in results if r["Status"] == "✅ Working"]
+                failed = [r for r in results if r["Status"] != "✅ Working"]
+                
+                st.markdown(f"""
+                <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="stat-card win"><div class="stat-label">// WORKING</div><div class="stat-value">{len(working)}</div></div>
+                    <div class="stat-card"><div class="stat-label">// FAILED</div><div class="stat-value">{len(failed)}</div></div>
+                    <div class="stat-card"><div class="stat-label">// TOTAL TESTED</div><div class="stat-value">{len(results)}</div></div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if working:
+                    st.subheader("✅ Working Models")
+                    st.dataframe(working, use_container_width=True)
+                
+                if failed:
+                    with st.expander(f"❌ Failed/Empty Models ({len(failed)})", expanded=False):
+                        st.dataframe(failed, use_container_width=True)
+
+    # ──────────────────────────────────────────────────────────────────
+    # TAB 7: DANGER ZONE
+    # ──────────────────────────────────────────────────────────────────
+    with main_tabs[6]:
         st.header("❌ Danger Zone")
         normal_users = {f"{u['username']} ({u['name']})": u for u in users if not u['is_admin']}
         if normal_users:

@@ -494,6 +494,9 @@ load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
+TRANSFER_STATION_API_KEY = os.getenv("TRANSFER_STATION_API_KEY", "")
+TRANSFER_STATION_BASE_URL = "https://makerend.com/v1"
+
 if not OPENROUTER_API_KEY:
     st.error("⚠️ OPENROUTER_API_KEY is not set. Add it to your .env file and restart.")
 
@@ -520,6 +523,36 @@ def fetch_openrouter_models():
     except Exception as e:
         st.warning(f"Could not fetch OpenRouter model list: {e}")
         return ["openai/gpt-4o", "anthropic/claude-3.5-sonnet", "meta-llama/llama-3.1-70b-instruct"]
+
+@st.cache_data(ttl=3600)
+def fetch_transfer_station_models():
+    """Fetch all available models from Transfer Station (MakerEnd) and return sorted list of model IDs."""
+    try:
+        resp = requests.get(
+            f"{TRANSFER_STATION_BASE_URL}/models",
+            headers={"Authorization": f"Bearer {TRANSFER_STATION_API_KEY}"},
+            timeout=15
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        models = [m["id"] for m in data.get("data", [])]
+        
+        # Filter for OpenAI, Claude, Gemini chat models
+        EXCLUDED = ('embedding', 'reranker', 'rerank', 'tts', 'whisper', 'audio', 'speech', 'voice', 'upload', 'video', 'image', 'lipsync', 'jev-', 'vision', 'realtime', 'transcribe', 'astra')
+        
+        chat_models = []
+        for m in models:
+            mid = m.lower()
+            if not (mid.startswith('gpt-') or mid.startswith('claude-') or mid.startswith('gemini-')):
+                continue
+            if any(s in mid for s in EXCLUDED):
+                continue
+            chat_models.append(m)
+            
+        return sorted(chat_models, key=lambda x: x.lower())
+    except Exception as e:
+        st.warning(f"Could not fetch Transfer Station model list: {e}")
+        return []
 
 
 import threading
@@ -560,6 +593,34 @@ def call_openrouter(model: str, messages: list, max_tokens: int, temperature: fl
     session = get_http_session()
     resp = session.post(
         f"{OPENROUTER_BASE_URL}/chat/completions",
+        headers=headers,
+        json=payload,
+        timeout=60
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return data["choices"][0]["message"]["content"]
+
+def call_transfer_station(model: str, messages: list, max_tokens: int, temperature: float,
+                          top_p: float, frequency_penalty: float) -> str:
+    """Send a chat completion request to Transfer Station (MakerEnd) using a pooled session."""
+    headers = {
+        "Authorization": f"Bearer {TRANSFER_STATION_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "top_p": top_p,
+        "frequency_penalty": frequency_penalty,
+        "stream": False,
+    }
+    
+    session = get_http_session()
+    resp = session.post(
+        f"{TRANSFER_STATION_BASE_URL}/chat/completions",
         headers=headers,
         json=payload,
         timeout=60
@@ -848,6 +909,7 @@ def jailbreak_challenge(global_settings):
         
     g_settings = global_settings[g_id]
     
+    active_endpoint = st.session_state.get(f'endpoint_{g_id}', g_settings.get('api_endpoint', 'openrouter'))
     active_model = st.session_state.get(f'model_{g_id}', g_settings['model_name'])
     active_sys_prompt = st.session_state.get(f'sys_prompt_{g_id}', g_settings['system_prompt'])
     active_f_word = st.session_state.get(f'f_word_{g_id}', g_settings['forbidden_word'])
@@ -860,14 +922,18 @@ def jailbreak_challenge(global_settings):
         with st.expander("🛠️ TESTER CONTROLS (OVERRIDE PARAMETERS)", expanded=False):
             st.info(f"Modifying parameters for **{selected_guardrail}** for your current session.")
             
-            # Fetch all available OpenRouter models for the dropdown
-            all_models = fetch_openrouter_models()
+            # Fetch models based on selected endpoint
+            if active_endpoint == 'transfer_station':
+                all_models = fetch_transfer_station_models()
+            else:
+                all_models = fetch_openrouter_models()
+                
             current_model_idx = all_models.index(active_model) if active_model in all_models else 0
             
             with st.form(f"tester_controls_{g_id}"):
-                st.caption("You can type ANY valid OpenRouter Model ID here manually.")
+                st.caption(f"You can type ANY valid {active_endpoint} Model ID here manually.")
                 model_name_override = st.text_input(
-                    "Model Override (OpenRouter)",
+                    f"Model Override ({active_endpoint})",
                     value=active_model
                 )
                 sys_prompt_override = st.text_area("Live System Prompt Override", value=active_sys_prompt, height=150)
@@ -974,14 +1040,24 @@ def jailbreak_challenge(global_settings):
             with st.spinner("Target AI is processing (Network Queue)..."):
                 try:
                     with LLM_SEMAPHORE:  # Blocks here if >5 people are currently generating
-                        response_text = call_openrouter(
-                            model=active_model,
-                            messages=llm_messages,
-                            max_tokens=active_tokens,
-                            temperature=active_temp,
-                            top_p=active_top_p,
-                            frequency_penalty=active_rep_pen,
-                        )
+                        if active_endpoint == 'transfer_station':
+                            response_text = call_transfer_station(
+                                model=active_model,
+                                messages=llm_messages,
+                                max_tokens=active_tokens,
+                                temperature=active_temp,
+                                top_p=active_top_p,
+                                frequency_penalty=active_rep_pen,
+                            )
+                        else:
+                            response_text = call_openrouter(
+                                model=active_model,
+                                messages=llm_messages,
+                                max_tokens=active_tokens,
+                                temperature=active_temp,
+                                top_p=active_top_p,
+                                frequency_penalty=active_rep_pen,
+                            )
                     
                     st.markdown(response_text)
                     
