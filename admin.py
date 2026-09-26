@@ -81,13 +81,16 @@ def admin_panel():
                     
                     saved_model = g_data.get('model_name', '')
                     model_opts_admin = all_models_admin.copy()
-                    if saved_model and saved_model not in model_opts_admin:
-                        model_opts_admin.insert(0, saved_model)
+                    
+                    # Try to set index to the saved model if valid, else default to the first valid model (index 0)
+                    default_idx = 0
+                    if saved_model in model_opts_admin:
+                        default_idx = model_opts_admin.index(saved_model)
                     
                     if not model_opts_admin:
                         m_name = st.text_input("Model Name", value=saved_model)
                     else:
-                        m_name = st.selectbox("Model Name", options=model_opts_admin, index=model_opts_admin.index(saved_model) if saved_model in model_opts_admin else 0)
+                        m_name = st.selectbox("Model Name", options=model_opts_admin, index=default_idx)
                     s_prompt = st.text_area("System Prompt", value=g_data.get('system_prompt', ''), height=150)
                     f_word = st.text_input("Forbidden Word", value=g_data.get('forbidden_word', ''))
                     

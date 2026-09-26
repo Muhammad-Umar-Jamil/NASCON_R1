@@ -933,15 +933,16 @@ def jailbreak_challenge(global_settings):
             with st.form(f"tester_controls_{g_id}"):
                 st.caption(f"Select a valid {active_endpoint} Model ID.")
                 
-                # Ensure the active model is in the options list
+                # Ensure the active model is in the options list ONLY if it's valid for this provider
                 model_options = all_models.copy()
-                if active_model not in model_options:
-                    model_options.insert(0, active_model)
+                default_idx = 0
+                if active_model in model_options:
+                    default_idx = model_options.index(active_model)
                     
                 model_name_override = st.selectbox(
                     f"Model Override ({active_endpoint})",
                     options=model_options,
-                    index=model_options.index(active_model)
+                    index=default_idx
                 )
                 sys_prompt_override = st.text_area("Live System Prompt Override", value=active_sys_prompt, height=150)
                 f_word_override = st.text_input("Live Forbidden Word Override", value=active_f_word)
