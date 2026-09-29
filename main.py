@@ -691,12 +691,18 @@ def main():
                     "GPT-5.6 Terra (OpenAI)": "gpt-5.6-terra",
                     "Claude 5 Sonnet (Anthropic)": "claude-sonnet-5",
                     "Claude 5 Fable (Anthropic)": "claude-fable-5",
-                    "Gemini 3.7 Flash (Google)": "gemini-3.7-flash"
+                    "Gemini 3.7 Flash (Google)": "gemini-3.7-flash",
+                    "✏️ Custom (Type manually)": "custom"
                 }
                 
                 col1, col2 = st.columns(2)
                 with col1:
                     exp_model_name = st.selectbox("Select Model", list(exp_models.keys()))
+                    if exp_model_name == "✏️ Custom (Type manually)":
+                        actual_model_id = st.text_input("Enter precise model ID (e.g. gpt-4o)")
+                    else:
+                        actual_model_id = exp_models[exp_model_name]
+                        
                 with col2:
                     exp_temperature = st.slider("Temperature", 0.0, 2.0, 0.7, 0.1, key="exp_temp")
                 
@@ -723,17 +729,20 @@ def main():
                     with st.chat_message("assistant"):
                         with st.spinner("Generating..."):
                             try:
-                                api_msgs = [{"role": "system", "content": exp_sys_prompt}] + st.session_state.exp_lab_messages
-                                exp_reply = call_transfer_station(
-                                    model=exp_models[exp_model_name],
-                                    messages=api_msgs,
-                                    max_tokens=1024,
-                                    temperature=exp_temperature,
-                                    top_p=0.9,
-                                    frequency_penalty=0.0
-                                )
-                                st.markdown(exp_reply)
-                                st.session_state.exp_lab_messages.append({"role": "assistant", "content": exp_reply})
+                                if not actual_model_id:
+                                    st.warning("Please specify a model ID first.")
+                                else:
+                                    api_msgs = [{"role": "system", "content": exp_sys_prompt}] + st.session_state.exp_lab_messages
+                                    exp_reply = call_transfer_station(
+                                        model=actual_model_id,
+                                        messages=api_msgs,
+                                        max_tokens=1024,
+                                        temperature=exp_temperature,
+                                        top_p=0.9,
+                                        frequency_penalty=0.0
+                                    )
+                                    st.markdown(exp_reply)
+                                    st.session_state.exp_lab_messages.append({"role": "assistant", "content": exp_reply})
                             except Exception as e:
                                 st.error(f"Error communicating with API: {e}")
         return
