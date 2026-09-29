@@ -500,6 +500,9 @@ TRANSFER_STATION_BASE_URL = "https://makerend.com/v1"
 if not OPENROUTER_API_KEY:
     st.error("⚠️ OPENROUTER_API_KEY is not set. Add it to your .env file and restart.")
 
+if not TRANSFER_STATION_API_KEY:
+    st.error("⚠️ TRANSFER_STATION_API_KEY is not set. You must add it to your Environment Variables on Railway.")
+
 # Points awarded per guardrail (used for the score displayed to the player)
 GUARDRAIL_POINTS = {
     "Guardrail 1 (Easy)": 500,
